@@ -1,0 +1,64 @@
+const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
+const { marshall } = require("@aws-sdk/util-dynamodb");
+const ddb = new DynamoDBClient();
+
+const shared = require('/opt/nodejs/index');
+
+exports.UNHANDLED_ERROR_MESSAGE = 'Something went wrong';
+
+exports.handler = async (event) => {
+  try {
+    const momento = await shared.getCacheClient(['user', 'game']);
+
+    const user = await momento.dictionaryGet
+    await exports.saveConnection(event.requestContext);
+
+    const response = {
+      statusCode: StatusCodes.OK,
+      headers: {
+        'Sec-WebSocket-Protocol': 'websocket'
+      }
+    };
+
+    return response;
+  } catch (err) {
+    console.error(err);
+    return {
+      statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
+      body: JSON.stringify({ message: exports.UNHANDLED_ERROR_MESSAGE })
+    };
+  }
+};
+
+exports.saveConnection = async (requestContext) => {
+  const command = exports.buildPutItemCommand(requestContext);
+  await ddb.send(command);
+};
+
+exports.buildPutItemCommand = (requestContext) => {
+  const params = {
+    TableName: process.env.TABLE_NAME,
+    Item: marshall({
+      pk: `${requestContext.connectionId}`,
+      sk: 'connection#',
+      ipAddress: requestContext.identity.sourceIp,
+      connectedAt: requestContext.connectedAt,
+      ttl: exports.calculateTtl(process.env.TTL_HOURS),
+      ...requestContext.authorizer?.userId && {
+        GSI1PK: requestContext.authorizer.userId,
+        GSI1SK: 'user#'
+      }
+    })
+  };
+
+  return new PutItemCommand(params);
+};
+
+exports.calculateTtl = (hoursToLive) => {
+  const hours = Number(hoursToLive);
+  const date = new Date();
+  date.setTime(date.getTime() + (hours * 60 * 60 * 1000));
+
+  const epoch = Math.round(date.getTime() / 1000);
+  return epoch;
+};
