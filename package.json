@@ -1,0 +1,9 @@
+{
+  "name": "acorn-hunt",
+  "version": "1.0.0",
+  "description": "How to build a WebSocket API using Momento",
+  "devDependencies": {    
+    "eslint": "^6.8.0",
+    "eslint-config-google": "^0.14.0"
+  }
+}

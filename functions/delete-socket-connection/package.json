@@ -1,0 +1,7 @@
+{
+  "name": "delete-socket-connection",
+  "version": "1.0.0",
+  "description": "Deletes all cache items and elements for the connection",
+  "main": "index.js",
+  "author": "Momento, Inc"
+}

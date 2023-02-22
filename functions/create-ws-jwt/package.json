@@ -1,0 +1,10 @@
+{
+  "name": "create-test-jwt",
+  "version": "1.0.0",
+  "description": "Creates an example JWT to be used for auth",
+  "main": "index.js",
+  "author": "Momento, Inc",
+  "devDependencies": {
+    "jsonwebtoken": "^9.0.0"
+  }
+}

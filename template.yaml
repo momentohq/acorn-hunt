@@ -1,0 +1,449 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Acorn Hunt - Websocket microservice
+
+Parameters:  
+  JwtSecret:
+    Type: String
+    Description: Secret key used for decrypting a JWT used in the authorizer
+  MomentoAuthToken:
+    Type: String
+    Description: Auth token used to initialize the Momento SimpleCacheClient
+  ApiStageName:
+    Type: String
+    Description: Stage name used in the WebSocket deployment
+    Default: demo
+
+Globals:
+  Function:
+    Timeout: 5
+    Runtime: nodejs18.x
+    MemorySize: 3072
+    Tracing: Active
+    Architectures:
+      - arm64
+    Layers:
+      - !Ref DependencyLayer
+    Handler: index.handler
+    Environment:
+      Variables:
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+        SECRET_ID: !Ref WebSocketSecret
+        ENDPOINT: !Sub https://${WebsocketApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}
+        CACHE_TTL: 3600
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST'"
+      AllowHeaders: "'Content-Type,Sec-WebSocket-Protocol'"
+      AllowOrigin: "'*'"
+
+Resources:
+  DependencyLayer:
+    Type: AWS::Serverless::LayerVersion
+    Metadata:
+      BuildMethod: nodejs18.x
+    Properties:
+      LayerName: websocket-dependencies
+      ContentUri: layers/
+      CompatibleRuntimes:
+        - nodejs18.x
+
+  WebSocketHelperApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      TracingEnabled: true
+      StageName: !Ref ApiStageName
+      MethodSettings:
+        - MetricsEnabled: True
+          ResourcePath: '/*'
+          HttpMethod: '*'
+          LoggingLevel: ERROR
+          DataTraceEnabled: True
+      DefinitionBody:
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: ./openapi.yaml
+
+  WebsocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: WebsocketApi
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  WebSocketAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      Name: WebSocketAuthorizer
+      ApiId: !Ref WebsocketApi
+      AuthorizerType: REQUEST
+      AuthorizerUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:AuthorizerFunction/invocations
+      AuthorizerCredentialsArn: !GetAtt AuthorizerExecutionRole.Arn
+      IdentitySource:
+        - route.request.header.Sec-WebSocket-Protocol
+
+  AuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AuthorizerFunction
+      CodeUri: functions/authorizer
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+
+  WebSocketSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:      
+      SecretString:
+        Fn::Sub:
+          - |-
+            {
+              "signature": "${signature}",
+              "momento": "${momentoAuthToken}"
+            }
+          - signature: !Ref JwtSecret
+            momentoAuthToken: !Ref MomentoAuthToken
+
+  AuthorizerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: InvokeAuthorizer
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                - lambda:InvokeFunction
+                Resource: !GetAtt AuthorizerFunction.Arn
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: $connect
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref WebSocketAuthorizer
+      OperationName: ConnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref ConnectIntegration
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      Description: Connect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateConnectionFunction.Arn}/invocations
+
+  CreateConnectionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/create-socket-connection
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+
+  ConnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CreateConnectionFunction
+      Principal: apigateway.amazonaws.com
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      OperationName: DisconnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref DisconnectIntegration
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      Description: Disconnect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteConnectionFunction.Arn}/invocations
+
+  DeleteConnectionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/delete-socket-connection
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:            
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+  
+  DisconnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DeleteConnectionFunction
+      Principal: apigateway.amazonaws.com
+  
+  LeaveGameRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: leave-game 
+      AuthorizationType: NONE
+      OperationName: LeaveGameRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref LeaveGameIntegration
+
+  LeaveGameIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      Description: Leave Game Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LeaveGameFunction.Arn}/invocations
+
+  LeaveGameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/leave-game
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:            
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: 
+                - !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*
+
+  LeaveGamePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LeaveGameFunction
+      Principal: apigateway.amazonaws.com
+
+  JoinGameRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: join-game
+      AuthorizationType: NONE
+      OperationName: JoinGameRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref JoinGameIntegration
+
+  JoinGameIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      Description: Join Game Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${JoinGameFunction.Arn}/invocations
+
+  JoinGameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/join-game
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:            
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: 
+                - !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*
+
+  JoinGamePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref JoinGameFunction
+      Principal: apigateway.amazonaws.com
+  
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: !Ref ApiStageName
+      Description: Deployment Stage for Websocket api
+      DeploymentId: !Ref Deployment
+      ApiId: !Ref WebsocketApi
+
+  Deployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+    - ConnectRoute
+    - DisconnectRoute
+    - JoinGameRoute
+    - LeaveGameRoute
+    - SendMessageRoute
+    Properties:
+      ApiId: !Ref WebsocketApi  
+
+  SendMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebsocketApi
+      RouteKey: send-message
+      AuthorizationType: NONE
+      OperationName: SendMessageRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref SendMessageIntegration
+
+  SendMessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebsocketApi
+      Description: SendMessage Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+
+  SendMessagePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SendMessageFunction
+      Principal: apigateway.amazonaws.com
+
+  SendMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/send-message
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:            
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: 
+                - !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*
+
+  CreateWebSocketJwt:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/create-ws-jwt      
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+      Events:
+        AuthenticateEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketHelperApi
+            Path: /authenticate
+            Method: POST
+
+  CreateGameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/create-game
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:            
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+      Events:
+        CreateGameEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketHelperApi
+            Path: /games
+            Method: POST
+
+  ListGamesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/list-games
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:            
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+      Events:
+        ListGamesEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketHelperApi
+            Path: /games
+            Method: GET
+
+Outputs:
+  WebsocketUri:
+    Description: The WSS Protocol Uri to connect to
+    Value: !Sub wss://${WebsocketApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}
+  WebSocketHelperApiUrl:
+    Description: Url of the WebSocket Helper API
+    Value: !Sub https://${WebSocketHelperApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}

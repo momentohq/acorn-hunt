@@ -1,0 +1,10 @@
+{
+  "name": "join-game",
+  "version": "1.0.0",
+  "description": "Add a user to a game",
+  "main": "index.js",
+  "author": "Momento, Inc",
+  "devDependencies": {
+    "@gomomento/sdk": "^1.0.0"
+  }
+}

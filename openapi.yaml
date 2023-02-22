@@ -1,0 +1,182 @@
+openapi: 3.0.0
+info:
+  title: Acorn Hunt WebSocket Helper
+  description: |
+    API to facilitate the Acorn Hunt WebSocket API
+  version: 1.0.0
+
+x-amazon-apigateway-request-validators:
+  Validate All:
+    validateRequestParameters: true
+    validateRequestBody: true
+x-amazon-apigateway-gateway-responses:
+  BAD_REQUEST_BODY:
+    statusCode: 400
+    responseTemplates:
+      application/json: '{ "message": "$context.error.validationErrorString" }'    
+
+paths:
+  /authenticate:
+    post:
+      summary: Gets an auth token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                userName:
+                  type: string
+                  description: User name to display
+                  minLength: 3
+                  maxLength: 20
+      responses:
+        200:
+          description: Generated auth token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/auth'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        500:
+          $ref: '#/components/responses/UnknownError'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateWebSocketJwt.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+
+  /games:
+    post:
+      summary: Create a new game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - duration
+                - name
+              properties:
+                duration:
+                  type: integer
+                  minimum: 60
+                  maximum: 7200
+                name:
+                  type: string
+                  minLength: 3
+                  maxLength: 20
+                mapId:
+                  type: string
+                isRanked:
+                  type: boolean
+      responses:
+        201:
+          description: The game was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/game'
+        404:
+          $ref: '#/components/responses/NotFound'
+        500:
+          $ref: '#/components/responses/UnknownError'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateGameFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+    get:
+      summary: Gets a list of all games      
+      responses:
+        200:
+          description: The game was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/gameList'
+        500:
+          $ref: '#/components/responses/UnknownError'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListGamesFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+
+components:
+  schemas:
+    auth:
+      description: Generated auth token
+      type: object
+      required:
+        - authToken
+      properties:
+        authToken:
+          type: string
+        expiresIn:
+          type: integer
+
+    game:
+      description: Identifier of the created game
+      type: object
+      properties:
+        id:
+          type: string
+
+    gameList:
+      description: List of open games
+      type: array
+      items:
+        type: object
+        properties:
+          id: 
+            type: string
+          name:
+            type: string
+
+  responses:
+    BadRequest:
+      description: Invalid input was provided
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+                example: Invalid input was provided
+    NotFound:
+      description: Unable to process request. Likely due to improperly formatted request.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+                example: A user with the provided id could not be found
+    UnknownError:
+      description: An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+                description: Unknown error message
+                example: An unexpected error occurred.

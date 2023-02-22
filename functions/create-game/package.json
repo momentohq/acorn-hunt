@@ -1,0 +1,15 @@
+{
+  "name": "create-game",
+  "version": "1.0.0",
+  "description": "Creates a new game to be used",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Momento, Inc",
+  "license": "ISC",
+  "devDependencies": {
+    "@gomomento/sdk": "^1.0.0",
+    "ulid": "^2.3.0"
+  }
+}
