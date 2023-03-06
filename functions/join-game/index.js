@@ -6,7 +6,7 @@ exports.handler = async (event) => {
   try {
     const input = JSON.parse(event.body);
 
-    const momento = await shared.getCacheClient(['game', 'connection', 'player', 'user']);
+    const momento = await shared.getCacheClient(['game', 'connection', 'player', 'user', 'chat']);
     const getGameResponse = await momento.dictionaryFetch('game', input.gameId);
     if (getGameResponse instanceof CacheDictionaryFetch.Miss) {
       await shared.respondWs(connectionId, { message: 'Game not found' });
@@ -23,8 +23,18 @@ exports.handler = async (event) => {
       await shared.broadcastMessage(momento, input.gameId, connectionId, {type: 'player-change', message: `${username.valueString()} joined the chat`, time: new Date().toISOString()})
     ]);
 
+    const messages = await momento.listFetch('chat', input.gameId);
     const players = await momento.setFetch('player', input.gameId);
-    await shared.respondWs(connectionId, { players: Array.from(players.valueSet()) });
+    
+    const connectionResponse = {
+      type: 'game-joined',
+      name: getGameResponse.valueRecord().name,
+      username: username.valueString(), 
+      players: Array.from(players.valueSet()),
+      messages: messages.valueListString().map(m => JSON.parse(m))
+    };
+
+    await shared.respondWs(connectionId, connectionResponse);
     return { statusCode: 200 };
   } catch (err) {
     console.error(err);

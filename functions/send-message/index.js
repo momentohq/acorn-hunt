@@ -1,4 +1,4 @@
-const { CacheDictionaryFetch } = require('@gomomento/sdk');
+const { CacheDictionaryGetField } = require('@gomomento/sdk');
 const shared = require('/opt/nodejs/index');
 
 exports.handler = async (event) => {
@@ -7,13 +7,16 @@ exports.handler = async (event) => {
     const input = JSON.parse(event.body);
 
     const momento = await shared.getCacheClient(['chat', 'game', 'connection']);
-    const getGameResponse = await momento.dictionaryFetch('game', input.gameId);
-    if (getGameResponse instanceof CacheDictionaryFetch.Miss) {
-      await shared.respondWs(connectionId, { message: 'Game not found' });
+
+
+    const username = await momento.get('connection', connectionId);
+    const gameIdResponse = await momento.dictionaryGetField('user', username.valueString(), 'currentGameId');
+    if (gameIdResponse instanceof CacheDictionaryGetField.Miss) {
+      await shared.respondWs(connectionId, { message: 'You are not active in any game' });
       return { statusCode: 200 };
     }
 
-    const username = await momento.get('connection', connectionId);
+    const gameId = gameIdResponse.valueString();
     const message = {
       type: 'new-message',
       username: username.valueString(),
@@ -22,8 +25,7 @@ exports.handler = async (event) => {
     }
 
     await Promise.all([
-      await momento.listPushBack('chat', input.gameId, JSON.stringify(message)),
-      await shared.broadcastMessage(momento, input.gameId, connectionId, message)
+      await shared.broadcastMessage(momento, gameId, connectionId, message)
     ]);
 
     return { statusCode: 200 };

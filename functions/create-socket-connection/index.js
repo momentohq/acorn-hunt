@@ -8,13 +8,13 @@ exports.handler = async (event) => {
     await Promise.all([
       await momento.dictionarySetField('user', username, 'wsConnectionId', event.requestContext.connectionId),
       await momento.set('connection', event.requestContext.connectionId, username)
-    ]);    
+    ]);
 
     return {
       statusCode: 200,
       headers: {
-        'Sec-WebSocket-Protocol': 'websocket',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        ...event.requestContext.protocol && { 'Sec-WebSocket-Protocol': event.requestContext.protocol }        
       }
     };
   } catch (err) {

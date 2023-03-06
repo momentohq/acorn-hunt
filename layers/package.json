@@ -7,7 +7,7 @@
     "@aws-lambda-powertools/metrics": "^1.5.1",
     "@aws-sdk/client-apigatewaymanagementapi": "^3.46.0",
     "@aws-sdk/client-secrets-manager": "^3.272.0",
-    "@gomomento/sdk": "^1.0.0",
+    "@gomomento/sdk": "^1.2.0",
     "jsonwebtoken": "^9.0.0",
     "ulid": "^2.3.0"
   },

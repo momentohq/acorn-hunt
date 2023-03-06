@@ -6,6 +6,6 @@
   "author": "Momento, Inc",
   "devDependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.46.0",
-    "@gomomento/sdk": "^1.0.0"
+    "@gomomento/sdk": "^1.2.0"
   }
 }

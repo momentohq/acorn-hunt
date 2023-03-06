@@ -5,6 +5,6 @@
   "main": "index.js",
   "author": "Momento, Inc",
   "devDependencies": {
-    "@gomomento/sdk": "^1.0.0"
+    "@gomomento/sdk": "^1.2.0"
   }
 }

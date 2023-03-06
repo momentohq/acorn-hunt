@@ -50,11 +50,13 @@ exports.respondWs = async (connectionId, message) => {
 };
 
 exports.broadcastMessage = async (momento, gameId, connectionIdToOmit, message) => {
+  await momento.listPushBack('chat', gameId, JSON.stringify(message));
+
   const connectionResponse = await momento.setFetch('connection', gameId);
   if (connectionResponse instanceof CacheSetFetch.Hit) {
     const connections = connectionResponse.valueArray().filter(connection => connection != connectionIdToOmit);
 
-    await Promise.all(connections.map(async (connection) => {
+    await Promise.allSettled(connections.map(async (connection) => {
       await apig.send(new PostToConnectionCommand({
         ConnectionId: connection,
         Data: JSON.stringify(message)

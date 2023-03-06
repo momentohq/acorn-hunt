@@ -8,21 +8,18 @@ exports.SIGNATURE_NOT_CONFIGURED = 'Unable to validate auth token because a sign
 
 exports.handler = async (event, context) => {
   try {
-    const websocketProtocolHeader = exports.getWebsocketProtocolHeader(event.headers);
-    if (!websocketProtocolHeader) {
-      throw new Error(exports.MISSING_WEBSOCKET_PROTOCOL_HEADER_MESSAGE);
-    }
-
+    let authToken, protocol;
     // Websockets are strict on the headers they allow, so in our solution we provide the auth token 
     // in the sec-websocket-protocol header comma separated with the subprotocol
     // Example: sec-websocket-protocol: websocket, eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9==
     // Alternatively, the user could pass the auth token in a "token" query string parameter
-    let [protocol, authToken] = websocketProtocolHeader.split(',').map(section => section.trim());
-    if (protocol?.toLowerCase() !== 'websocket') {
-      throw new Error(exports.INVALID_SUBPROTOCOL_MESSAGE);
-    }
-
-    if (!authToken) {
+    const websocketProtocolHeader = exports.getWebsocketProtocolHeader(event.headers);
+    if (websocketProtocolHeader) {
+      [protocol, authToken] = websocketProtocolHeader.split(',').map(section => section.trim());
+      if (protocol?.toLowerCase() !== 'websocket') {
+        throw new Error(exports.INVALID_SUBPROTOCOL_MESSAGE);
+      }
+    } else {
       if (!event?.queryStringParameters?.access_token) {
         throw new Error(exports.MISSING_AUTH_TOKEN_MESSAGE);
       }
@@ -31,7 +28,7 @@ exports.handler = async (event, context) => {
     }
 
     const jwtData = await exports.verifyJwt(authToken);
-    const policy = exports.getPolicy(event.methodArn, jwtData);
+    const policy = exports.getPolicy(event.methodArn, jwtData, protocol);
 
     return policy;
   } catch (err) {
@@ -41,7 +38,7 @@ exports.handler = async (event, context) => {
   }
 };
 
-exports.getPolicy = (methodArn, jwtData) => {
+exports.getPolicy = (methodArn, jwtData, protocol) => {
   return {
     principalId: jwtData.userId,
     ...methodArn && {
@@ -54,15 +51,16 @@ exports.getPolicy = (methodArn, jwtData) => {
         }]
       }
     },
-    context: exports.generateRequestContext(jwtData)
+    context: exports.generateRequestContext(jwtData, protocol)
   };
 };
 
-exports.generateRequestContext = (jwtData) => {
+exports.generateRequestContext = (jwtData, protocol) => {
   return {
     username: jwtData.username,
     ...jwtData.firstName && { firstName: jwtData.firstName },
-    ...jwtData.lastName && { lastName: jwtData.lastName }
+    ...jwtData.lastName && { lastName: jwtData.lastName },
+    ...protocol && { protocol: protocol}
   };
 };
 

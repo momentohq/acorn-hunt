@@ -80,9 +80,7 @@ Resources:
       ApiId: !Ref WebsocketApi
       AuthorizerType: REQUEST
       AuthorizerUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:AuthorizerFunction/invocations
-      AuthorizerCredentialsArn: !GetAtt AuthorizerExecutionRole.Arn
-      IdentitySource:
-        - route.request.header.Sec-WebSocket-Protocol
+      AuthorizerCredentialsArn: !GetAtt AuthorizerExecutionRole.Arn      
 
   AuthorizerFunction:
     Type: AWS::Serverless::Function

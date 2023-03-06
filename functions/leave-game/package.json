@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "description": "Removes a player from the provided game",
   "main": "index.js",
-  "author": "Momento, Inc"
+  "author": "Momento, Inc",
+  "devDependencies": {
+    "@gomomento/sdk": "^1.2.0"
+  }
 }
