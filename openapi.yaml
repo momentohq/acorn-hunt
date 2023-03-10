@@ -111,6 +111,108 @@ paths:
         httpMethod: POST
         type: aws_proxy
 
+  /points:
+    post:
+      summary: Add or remove points from the caller in their active game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - count
+              properties:
+                count:
+                  type: integer
+                  minimum: -10
+                  maximum: 10                
+      responses:
+        200:
+          description: The points were successfully added to the player score
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - score
+                properties:
+                  score:
+                    type: integer
+        409:
+          $ref: '#/components/responses/Conflict'
+        500:
+          $ref: '#/components/responses/UnknownError'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${IncrementPointsFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+
+  /super-abilities:
+    post:
+      summary: Add super-ability uses to the caller for their active game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - count
+              properties:
+                count:
+                  type: integer
+                  minimum: 1
+                  maximum: 3                
+      responses:
+        200:
+          description: The uses were added to the caller
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - remaining
+                properties:
+                  remaining:
+                    type: integer
+        409:
+          $ref: '#/components/responses/Conflict'
+        500:
+          $ref: '#/components/responses/UnknownError'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SuperAbilityFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+    delete:
+      summary: Remves a super-ability use for the caller in the active game
+      responses:
+        200:
+          description: The super-ability count decreased
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - remaining
+                properties:
+                  remaining:
+                    type: integer
+        409:
+          $ref: '#/components/responses/Conflict'
+        500:
+          $ref: '#/components/responses/UnknownError'
+      x-amazon-apigateway-request-validator: Validate All
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SuperAbilityFunction.Arn}/invocations
+        httpMethod: POST
+        type: aws_proxy
+
 components:
   schemas:
     auth:
@@ -167,6 +269,20 @@ components:
               message:
                 type: string
                 example: A user with the provided id could not be found
+
+    Conflict:
+      description: Unable to process request due to the state of the entity
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+                example: You are not part of an active game
+
     UnknownError:
       description: An unexpected error occurred on the server.
       content:

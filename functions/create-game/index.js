@@ -15,20 +15,12 @@ exports.handler = async (event) => {
         ...input.mapId && { mapId: input.mapId },
         ...input.isRanked && { isRanked: `${input.isRanked}` }
       }, { ttl: CollectionTtl.of(input.duration) }),
-      await momento.setAddElement('game', 'list', JSON.stringify({id, name: input.name}))
-    ]);    
+      await momento.setAddElement('game', 'list', JSON.stringify({ id, name: input.name }))
+    ]);
 
-    return {
-      statusCode: 201,
-      body: JSON.stringify({ id }),
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    };
+    return shared.buildResponse(201, { id });
   } catch (err) {
     console.error(err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Something went wrong' }),
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    };
+    return shared.buildResponse(500, { message: 'Something went wrong' });
   }
 };

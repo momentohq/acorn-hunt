@@ -1,7 +1,7 @@
 {
-  "name": "delete-socket-connection",
+  "name": "super-ability-usage",
   "version": "1.0.0",
-  "description": "Deletes all cache items and elements for the connection",
+  "description": "Increases or decreases the super-ability for a player in a game",
   "main": "index.js",
   "author": "Momento, Inc",
   "devDependencies": {

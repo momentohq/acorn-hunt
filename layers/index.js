@@ -1,5 +1,5 @@
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
-const { SimpleCacheClient, EnvMomentoTokenProvider, Configurations, CacheSetFetch } = require('@gomomento/sdk');
+const { CacheClient, EnvMomentoTokenProvider, Configurations, CacheSetFetch } = require('@gomomento/sdk');
 const { Metrics } = require('@aws-lambda-powertools/metrics');
 const { ApiGatewayManagementApiClient, PostToConnectionCommand } = require('@aws-sdk/client-apigatewaymanagementapi');
 
@@ -29,7 +29,7 @@ exports.getCacheClient = async (caches) => {
     process.env.AUTH_TOKEN = authToken;
     const credentials = new EnvMomentoTokenProvider({ environmentVariableName: 'AUTH_TOKEN' });
 
-    const cacheClient = new SimpleCacheClient({
+    const cacheClient = new CacheClient({
       configuration: Configurations.Laptop.latest(),
       credentialProvider: credentials,
       defaultTtlSeconds: Number(process.env.CACHE_TTL)
@@ -65,6 +65,14 @@ exports.broadcastMessage = async (momento, gameId, connectionIdToOmit, message) 
   } else {
     console.log(connectionResponse);
   }
+};
+
+exports.buildResponse = (statusCode, body) => {
+  return {
+    statusCode: statusCode,
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    ...body && { body: JSON.stringify(body) }
+  };
 };
 
 const initializeCaches = async (caches) => {

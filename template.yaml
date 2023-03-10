@@ -9,7 +9,7 @@ Parameters:
     Description: Secret key used for decrypting a JWT used in the authorizer
   MomentoAuthToken:
     Type: String
-    Description: Auth token used to initialize the Momento SimpleCacheClient
+    Description: Auth token used to initialize the Momento CacheClient
   ApiStageName:
     Type: String
     Description: Stage name used in the WebSocket deployment
@@ -437,6 +437,52 @@ Resources:
             RestApiId: !Ref WebSocketHelperApi
             Path: /games
             Method: GET
+
+  IncrementPointsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/increment-points
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:            
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+      Events:
+        AddPoints:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketHelperApi
+            Path: /points
+            Method: POST
+
+  SuperAbilityFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/super-ability-usage
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:            
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WebSocketSecret
+      Events:
+        AddSuperAbility:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketHelperApi
+            Path: /super-abilities
+            Method: POST
+        RemoveSuperAbility:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketHelperApi
+            Path: /super-abilities
+            Method: DELETE
 
 Outputs:
   WebsocketUri:

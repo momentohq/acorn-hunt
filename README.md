@@ -1,3 +1,5 @@
+![](./images/banner.png)
+
 ## Acorn Hunt
 
 Welcome to the services that power Momento's very own game, *Acorn Hunt*!

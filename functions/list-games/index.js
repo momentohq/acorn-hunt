@@ -11,18 +11,10 @@ exports.handler = async (event) => {
       gameList = games.valueArray().map(g => JSON.parse(g));
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(gameList),
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    };
+    return shared.buildResponse(200, gameList);
   }
   catch (err) {
     console.err(err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Something went wrong' }),
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    };
+    return shared.buildResponse(500, { message: 'Something went wrong'});
   }
 };
