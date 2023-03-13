@@ -18,7 +18,7 @@ exports.handler = async (event) => {
 
     await Promise.all([
       await momento.setAddElement('player', input.gameId, username),
-      await initializeLeaderboardScore(input.gameId, username),
+      await initializeLeaderboardScore(momento, input.gameId, username),
       await momento.setAddElement('connection', input.gameId, connectionId),
       await momento.dictionarySetField('user', username, 'currentGameId', input.gameId),
       await shared.broadcastMessage(momento, input.gameId, connectionId, { type: 'player-change', message: `${username} joined the chat`, time: new Date().toISOString() })
@@ -32,7 +32,7 @@ exports.handler = async (event) => {
     const connectionResponse = {
       type: 'game-joined',
       name: getGameResponse.valueRecord().name,
-      username: username.valueString(),
+      username: username,
       players: Array.from(players.valueSet()),
       messages: messages.valueListString().map(m => JSON.parse(m))
     };
@@ -47,7 +47,7 @@ exports.handler = async (event) => {
   }
 };
 
-const initializeLeaderboardScore = async (gameId, username) => {
+const initializeLeaderboardScore = async (momento, gameId, username) => {
   const existingScore = await momento.sortedSetGetScore('leaderboard', gameId, username);
   if (existingScore instanceof CacheSortedSetGetScore.Miss) {
     await momento.sortedSetPutElement('leaderboard', gameId, username, 0.3);
