@@ -54,6 +54,7 @@ paths:
   /games:
     post:
       summary: Create a new game
+      operationId: createGame
       requestBody:
         required: true
         content:
@@ -94,7 +95,8 @@ paths:
         httpMethod: POST
         type: aws_proxy
     get:
-      summary: Gets a list of all games      
+      summary: Gets a list of all games
+      operationId: listGames
       responses:
         200:
           description: The game was created
@@ -114,6 +116,7 @@ paths:
   /points:
     post:
       summary: Add or remove points from the caller in their active game
+      operationId: updatePoints
       requestBody:
         required: true
         content:
@@ -153,6 +156,7 @@ paths:
   /super-abilities:
     post:
       summary: Add super-ability uses to the caller for their active game
+      operationId: increaseSuperAbility
       requestBody:
         required: true
         content:
@@ -190,6 +194,7 @@ paths:
         type: aws_proxy
     delete:
       summary: Remves a super-ability use for the caller in the active game
+      operationId: decreaseSuperAbility
       responses:
         200:
           description: The super-ability count decreased
