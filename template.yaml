@@ -228,8 +228,6 @@ Resources:
     DependsOn:
     - ConnectRoute
     - DisconnectRoute
-    - JoinGameRoute
-    - LeaveGameRoute
     - SendMessageRoute
     Properties:
       ApiId: !Ref WebsocketApi  
