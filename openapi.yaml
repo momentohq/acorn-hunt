@@ -1,8 +1,8 @@
 openapi: 3.0.0
 info:
-  title: Acorn Hunt WebSocket Helper
+  title: Acorn Hunt Control Plane API
   description: |
-    API to facilitate the Acorn Hunt WebSocket API
+    Control plane operations for Acorn Hunt
   version: 1.0.0
 
 x-amazon-apigateway-request-validators:
@@ -51,173 +51,6 @@ paths:
         httpMethod: POST
         type: aws_proxy
 
-  /games:
-    post:
-      summary: Create a new game
-      operationId: createGame
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - duration
-                - name
-              properties:
-                duration:
-                  type: integer
-                  minimum: 60
-                  maximum: 7200
-                name:
-                  type: string
-                  minLength: 3
-                  maxLength: 20
-                mapId:
-                  type: string
-                isRanked:
-                  type: boolean
-      responses:
-        201:
-          description: The game was created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/game'
-        404:
-          $ref: '#/components/responses/NotFound'
-        500:
-          $ref: '#/components/responses/UnknownError'
-      x-amazon-apigateway-request-validator: Validate All
-      x-amazon-apigateway-integration:
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateGameFunction.Arn}/invocations
-        httpMethod: POST
-        type: aws_proxy
-    get:
-      summary: Gets a list of all games
-      operationId: listGames
-      responses:
-        200:
-          description: The game was created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/gameList'
-        500:
-          $ref: '#/components/responses/UnknownError'
-      x-amazon-apigateway-request-validator: Validate All
-      x-amazon-apigateway-integration:
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListGamesFunction.Arn}/invocations
-        httpMethod: POST
-        type: aws_proxy
-
-  /points:
-    post:
-      summary: Add or remove points from the caller in their active game
-      operationId: updatePoints
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - count
-              properties:
-                count:
-                  type: integer
-                  minimum: -10
-                  maximum: 10                
-      responses:
-        200:
-          description: The points were successfully added to the player score
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - score
-                properties:
-                  score:
-                    type: integer
-        409:
-          $ref: '#/components/responses/Conflict'
-        500:
-          $ref: '#/components/responses/UnknownError'
-      x-amazon-apigateway-request-validator: Validate All
-      x-amazon-apigateway-integration:
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${IncrementPointsFunction.Arn}/invocations
-        httpMethod: POST
-        type: aws_proxy
-
-  /super-abilities:
-    post:
-      summary: Add super-ability uses to the caller for their active game
-      operationId: increaseSuperAbility
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - count
-              properties:
-                count:
-                  type: integer
-                  minimum: 1
-                  maximum: 3                
-      responses:
-        200:
-          description: The uses were added to the caller
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - remaining
-                properties:
-                  remaining:
-                    type: integer
-        409:
-          $ref: '#/components/responses/Conflict'
-        500:
-          $ref: '#/components/responses/UnknownError'
-      x-amazon-apigateway-request-validator: Validate All
-      x-amazon-apigateway-integration:
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SuperAbilityFunction.Arn}/invocations
-        httpMethod: POST
-        type: aws_proxy
-    delete:
-      summary: Remves a super-ability use for the caller in the active game
-      operationId: decreaseSuperAbility
-      responses:
-        200:
-          description: The super-ability count decreased
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - remaining
-                properties:
-                  remaining:
-                    type: integer
-        409:
-          $ref: '#/components/responses/Conflict'
-        500:
-          $ref: '#/components/responses/UnknownError'
-      x-amazon-apigateway-request-validator: Validate All
-      x-amazon-apigateway-integration:
-        uri:
-          Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SuperAbilityFunction.Arn}/invocations
-        httpMethod: POST
-        type: aws_proxy
-
 components:
   schemas:
     auth:
@@ -230,24 +63,6 @@ components:
           type: string
         expiresIn:
           type: integer
-
-    game:
-      description: Identifier of the created game
-      type: object
-      properties:
-        id:
-          type: string
-
-    gameList:
-      description: List of open games
-      type: array
-      items:
-        type: object
-        properties:
-          id: 
-            type: string
-          name:
-            type: string
 
   responses:
     BadRequest:
@@ -262,32 +77,7 @@ components:
               message:
                 type: string
                 example: Invalid input was provided
-    NotFound:
-      description: Unable to process request. Likely due to improperly formatted request.
-      content:
-        application/json:
-          schema:
-            type: object
-            required:
-              - message
-            properties:
-              message:
-                type: string
-                example: A user with the provided id could not be found
-
-    Conflict:
-      description: Unable to process request due to the state of the entity
-      content:
-        application/json:
-          schema:
-            type: object
-            required:
-              - message
-            properties:
-              message:
-                type: string
-                example: You are not part of an active game
-
+   
     UnknownError:
       description: An unexpected error occurred on the server.
       content:

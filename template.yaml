@@ -14,6 +14,9 @@ Parameters:
     Type: String
     Description: Stage name used in the WebSocket deployment
     Default: demo
+  GitHubConnection:
+    Type: String
+    Description: Arn of the App Runner connection to GitHub
 
 Globals:
   Function:
@@ -29,7 +32,7 @@ Globals:
     Environment:
       Variables:
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
-        SECRET_ID: !Ref WebSocketSecret
+        SECRET_ID: !Ref AcornHuntSecret
         ENDPOINT: !Sub https://${WebsocketApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStageName}
         CACHE_TTL: 3600
   Api:
@@ -53,13 +56,7 @@ Resources:
     Type: AWS::Serverless::Api
     Properties:
       TracingEnabled: true
-      StageName: !Ref ApiStageName
-      MethodSettings:
-        - MetricsEnabled: True
-          ResourcePath: '/*'
-          HttpMethod: '*'
-          LoggingLevel: ERROR
-          DataTraceEnabled: True
+      StageName: !Ref ApiStageName      
       DefinitionBody:
         Fn::Transform:
           Name: AWS::Include
@@ -94,9 +91,9 @@ Resources:
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
+              Resource: !Ref AcornHuntSecret
 
-  WebSocketSecret:
+  AcornHuntSecret:
     Type: AWS::SecretsManager::Secret
     Properties:      
       SecretString:
@@ -165,7 +162,7 @@ Resources:
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
+              Resource: !Ref AcornHuntSecret
 
   ConnectPermission:
     Type: AWS::Lambda::Permission
@@ -207,7 +204,7 @@ Resources:
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
+              Resource: !Ref AcornHuntSecret
   
   DisconnectPermission:
     Type: AWS::Lambda::Permission
@@ -216,100 +213,6 @@ Resources:
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref DeleteConnectionFunction
-      Principal: apigateway.amazonaws.com
-  
-  LeaveGameRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebsocketApi
-      RouteKey: leave-game 
-      AuthorizationType: NONE
-      OperationName: LeaveGameRoute
-      Target: !Join
-        - '/'
-        - - 'integrations'
-          - !Ref LeaveGameIntegration
-
-  LeaveGameIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebsocketApi
-      Description: Leave Game Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LeaveGameFunction.Arn}/invocations
-
-  LeaveGameFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: functions/leave-game
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: 2012-10-17
-          Statement:            
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
-            - Effect: Allow
-              Action:
-                - execute-api:ManageConnections
-              Resource: 
-                - !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*
-
-  LeaveGamePermission:
-    Type: AWS::Lambda::Permission
-    DependsOn:
-      - WebsocketApi
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref LeaveGameFunction
-      Principal: apigateway.amazonaws.com
-
-  JoinGameRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebsocketApi
-      RouteKey: join-game
-      AuthorizationType: NONE
-      OperationName: JoinGameRoute
-      Target: !Join
-        - '/'
-        - - 'integrations'
-          - !Ref JoinGameIntegration
-
-  JoinGameIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebsocketApi
-      Description: Join Game Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${JoinGameFunction.Arn}/invocations
-
-  JoinGameFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: functions/join-game
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: 2012-10-17
-          Statement:            
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
-            - Effect: Allow
-              Action:
-                - execute-api:ManageConnections
-              Resource: 
-                - !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*
-
-  JoinGamePermission:
-    Type: AWS::Lambda::Permission
-    DependsOn:
-      - WebsocketApi
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref JoinGameFunction
       Principal: apigateway.amazonaws.com
   
   Stage:
@@ -371,7 +274,7 @@ Resources:
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
+              Resource: !Ref AcornHuntSecret
             - Effect: Allow
               Action:
                 - execute-api:ManageConnections
@@ -389,7 +292,7 @@ Resources:
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
+              Resource: !Ref AcornHuntSecret
       Events:
         AuthenticateEvent:
           Type: Api
@@ -398,91 +301,74 @@ Resources:
             Path: /authenticate
             Method: POST
 
-  CreateGameFunction:
+  PostToConnectionsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/create-game
+      CodeUri: functions/post-to-connections
       Policies:
         - AWSLambdaBasicExecutionRole
         - Version: 2012-10-17
-          Statement:            
+          Statement:
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
+              Resource: !Ref AcornHuntSecret
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: 
+                - !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketApi}/*
       Events:
-        CreateGameEvent:
-          Type: Api
+        PostEvent:
+          Type: EventBridgeRule
           Properties:
-            RestApiId: !Ref WebSocketHelperApi
-            Path: /games
-            Method: POST
+            Pattern:
+              detail-type:
+                - Post to Connections
+              source:
+                - acorn-hunt
 
-  ListGamesFunction:
-    Type: AWS::Serverless::Function
+  GameServiceAppRunnerRole:
+    Type: AWS::IAM::Role
     Properties:
-      CodeUri: functions/list-games
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: tasks.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
       Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: 2012-10-17
-          Statement:            
+        - PolicyName: GameServiceAppRunnerRole
+          PolicyDocument:
+            Statement:
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
-      Events:
-        ListGamesEvent:
-          Type: Api
-          Properties:
-            RestApiId: !Ref WebSocketHelperApi
-            Path: /games
-            Method: GET
+              Resource:
+                - !Ref AcornHuntSecret
+            - Effect: Allow
+              Action:
+                - events:PutEvents
+              Resource:
+                - !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
 
-  IncrementPointsFunction:
-    Type: AWS::Serverless::Function
+  GameMicroservice:
+    Type: AWS::AppRunner::Service
     Properties:
-      CodeUri: functions/increment-points
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: 2012-10-17
-          Statement:            
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
-      Events:
-        AddPoints:
-          Type: Api
-          Properties:
-            RestApiId: !Ref WebSocketHelperApi
-            Path: /points
-            Method: POST
-
-  SuperAbilityFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: functions/super-ability-usage
-      Policies:
-        - AWSLambdaBasicExecutionRole
-        - Version: 2012-10-17
-          Statement:            
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource: !Ref WebSocketSecret
-      Events:
-        AddSuperAbility:
-          Type: Api
-          Properties:
-            RestApiId: !Ref WebSocketHelperApi
-            Path: /super-abilities
-            Method: POST
-        RemoveSuperAbility:
-          Type: Api
-          Properties:
-            RestApiId: !Ref WebSocketHelperApi
-            Path: /super-abilities
-            Method: DELETE
+      SourceConfiguration:
+        AuthenticationConfiguration:
+          ConnectionArn: !Ref GitHubConnection
+        AutoDeploymentsEnabled: true
+        CodeRepository:
+          CodeConfiguration:
+            ConfigurationSource: REPOSITORY
+          RepositoryUrl: https://github.com/momentohq/acorn-hunt-game-service
+          SourceCodeVersion:
+            Type: BRANCH
+            Value: main
+      InstanceConfiguration:
+        InstanceRoleArn: !GetAtt GameServiceAppRunnerRole.Arn
 
 Outputs:
   WebsocketUri:

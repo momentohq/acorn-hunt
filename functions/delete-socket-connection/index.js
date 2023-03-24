@@ -15,7 +15,7 @@ exports.handler = async (event) => {
         await momento.setRemoveElement('player', gameId, username.valueString()),
         await momento.dictionaryRemoveField('user', username.valueString(), 'currentGameId', gameId),
         await momento.setRemoveElement('connection', gameId, connectionId),
-        await shared.broadcastMessage(momento, gameId, connectionId, { type: 'player-changed', message: `${username.valueString()} left the chat`, time: new Date().toISOString() })
+        await shared.broadcastMessage(momento, gameId, connectionId, { type: 'player-left',  username: username.valueString(), message: `${username.valueString()} left the chat`, time: new Date().toISOString() })
       ]);
     }
 

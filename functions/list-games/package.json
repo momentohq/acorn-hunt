@@ -1,7 +1,0 @@
-{
-  "name": "list-games",
-  "version": "1.0.0",
-  "description": "Lists all the active games",
-  "main": "index.js",
-  "author": "Momento, Inc"
-}

@@ -1,0 +1,10 @@
+{
+  "name": "post-to-connections",
+  "version": "1.0.0",
+  "description": "Posts a message to the provided websocket connection ids",
+  "main": "index.js",
+  "author": "Momento, Inc",
+  "devDependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.293.0"
+  }
+}
