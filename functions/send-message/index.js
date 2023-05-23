@@ -6,7 +6,7 @@ exports.handler = async (event) => {
   try {
     const input = JSON.parse(event.body);
 
-    const momento = await shared.getCacheClient(['chat', 'game', 'connection']);
+    const momento = await shared.getCacheClient();
 
 
     const username = await momento.get('connection', connectionId);

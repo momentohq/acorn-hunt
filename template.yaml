@@ -17,6 +17,10 @@ Parameters:
   GitHubConnection:
     Type: String
     Description: Arn of the App Runner connection to GitHub
+  MongoDBConnectionString:
+    Type: String
+    Description: Connection string for mongodb instance
+    NoEcho: true
 
 Globals:
   Function:
@@ -101,10 +105,12 @@ Resources:
           - |-
             {
               "signature": "${signature}",
-              "momento": "${momentoAuthToken}"
+              "momento": "${momentoAuthToken}",
+              "mongodb": "${mongoDbConnection}"
             }
           - signature: !Ref JwtSecret
             momentoAuthToken: !Ref MomentoAuthToken
+            mongoDbConnection: !Ref MongoDBConnectionString
 
   AuthorizerExecutionRole:
     Type: AWS::IAM::Role
@@ -367,6 +373,27 @@ Resources:
             Value: main
       InstanceConfiguration:
         InstanceRoleArn: !GetAtt GameServiceAppRunnerRole.Arn
+
+  UserInfoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/userinfo
+      Timeout: 30
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref AcornHuntSecret            
+      Events:
+        Fetch:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketHelperApi
+            Path: /userinfo
+            Method: GET
 
 Outputs:
   WebsocketUri:

@@ -2,7 +2,7 @@ const shared = require('/opt/nodejs/index');
 
 exports.handler = async (event) => {
   try {
-    const momento = await shared.getCacheClient(['user', 'connection']);
+    const momento = await shared.getCacheClient();
     const username = event.requestContext.authorizer.username;
 
     await Promise.all([

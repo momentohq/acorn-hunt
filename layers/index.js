@@ -23,7 +23,7 @@ exports.getSecret = async (secretKey) => {
   }
 };
 
-exports.getCacheClient = async (caches) => {
+exports.getCacheClient = async () => {
   if (!momento) {
     const authToken = await exports.getSecret('momento');
     process.env.AUTH_TOKEN = authToken;
@@ -35,8 +35,6 @@ exports.getCacheClient = async (caches) => {
       defaultTtlSeconds: Number(process.env.CACHE_TTL)
     });
     momento = cacheClient;
-
-    await initializeCaches(caches);
   }
 
   return momento;
@@ -74,13 +72,3 @@ exports.buildResponse = (statusCode, body) => {
     ...body && { body: JSON.stringify(body) }
   };
 };
-
-const initializeCaches = async (caches) => {
-  if (caches?.length) {
-    const listCachesResponse = await momento.listCaches();
-    const cachesToAdd = caches.filter(c => !listCachesResponse.caches.some(cache => cache.name == c));
-    for (const cacheToAdd of cachesToAdd) {
-      await momento.createCache(cacheToAdd)
-    }
-  }
-}

@@ -7,7 +7,7 @@ exports.handler = async (event) => {
   const { connections, message, saveToChatHistory, gameId } = event.detail;
 
   if(saveToChatHistory){
-    const momento = await shared.getCacheClient(['chat']);    
+    const momento = await shared.getCacheClient();    
     await momento.listPushBack('chat', gameId, JSON.stringify(message));
   }
 
